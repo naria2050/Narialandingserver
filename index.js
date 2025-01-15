@@ -15,6 +15,8 @@ app.use(cors({
     origin: [
         'http://localhost:5173',
         'http://localhost:3000',
+        'https://landingclint-jlxhx55bu-narias-projects.vercel.app',
+        'https://landingclint.vercel.app',
     ],
     credentials: true
 }));
