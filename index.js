@@ -16,8 +16,9 @@ const port = process.env.PORT || 5000;
 // // middleware
 app.use(cors({
     origin: [
-        'https://landingclint-jlxhx55bu-narias-projects.vercel.app',
+        
         'https://landingclint.vercel.app',
+        'https://landingclint-jlxhx55bu-narias-projects.vercel.app',
     ],
     credentials: true
 }));
