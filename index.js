@@ -1,8 +1,10 @@
 const express = require('express');
 const cors = require('cors');
-require('dotenv').config();
-const axios = require('axios');
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
+const axios = require('axios');
+const multer = require('multer');
+const path = require('path');
+require('dotenv').config();
 
 const app = express();
 const port = process.env.PORT || 5000;
@@ -10,16 +12,20 @@ const port = process.env.PORT || 5000;
 // Middleware
 app.use(cors({
     origin: [
-        'https://landingclint.vercel.app',
-        'https://landingclint-jlxhx55bu-narias-projects.vercel.app',
+        'http://localhost:5173',
+        // Add other allowed origins if necessary
     ],
     credentials: true
 }));
 app.use(express.json());
 
+// Set up multer for image uploads
+const storage = multer.memoryStorage();
+const upload = multer({ storage: storage });
+
+// MongoDB Connection URI
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@hajj.zsqpd.mongodb.net/?retryWrites=true&w=majority&appName=Hajj`;
 
-// Create a MongoClient with a MongoClientOptions object to set the Stable API version
 const client = new MongoClient(uri, {
     serverApi: {
         version: ServerApiVersion.v1,
@@ -27,6 +33,28 @@ const client = new MongoClient(uri, {
         deprecationErrors: true,
     }
 });
+
+// ImgBB API configuration
+const IMGBB_API_KEY = '5c49c7e28a6807775bcd1899796bdc4b';
+
+// Function to upload image to ImgBB
+const uploadImageToImgBB = async (imageBuffer) => {
+    try {
+        const formData = new FormData();
+        formData.append('image', imageBuffer, 'image.jpg');
+
+        const response = await axios.post(`https://api.imgbb.com/1/upload?key=${IMGBB_API_KEY}`, formData, {
+            headers: formData.getHeaders(),
+        });
+
+        if (response.data && response.data.data && response.data.data.url) {
+            return response.data.data.url;
+        }
+        throw new Error('Failed to upload image');
+    } catch (error) {
+        throw new Error(error.message);
+    }
+};
 
 async function run() {
     try {
@@ -42,16 +70,6 @@ async function run() {
         app.get('/booking', async (req, res) => {
             try {
                 const result = await BookingCollection.find().toArray();
-                res.send(result);
-            } catch (error) {
-                console.error(error);
-                res.status(500).send("Internal Server Error");
-            }
-        });
-
-        app.get('/card', async (req, res) => {
-            try {
-                const result = await CardCollection.find().toArray();
                 res.send(result);
             } catch (error) {
                 console.error(error);
@@ -142,19 +160,6 @@ async function run() {
                 res.status(500).send("Internal Server Error");
             }
         });
-
-        app.delete('/card/:id', async (req, res) => {
-            try {
-                const id = req.params.id;
-                const query = { _id: new ObjectId(id) };
-                const result = await CardCollection.deleteOne(query);
-                res.send(result);
-            } catch (error) {
-                console.error(error);
-                res.status(500).send("Internal Server Error");
-            }
-        });
-
         app.delete('/booking/:id', async (req, res) => {
             try {
                 const id = req.params.id;
@@ -167,12 +172,56 @@ async function run() {
             }
         });
 
-        // Ping to confirm connection
+        // GET all cards
+        app.get('/card', async (req, res) => {
+            try {
+                const result = await CardCollection.find().toArray();
+                res.send(result);
+            } catch (error) {
+                console.error('Error fetching cards:', error);
+                res.status(500).send("Internal Server Error");
+            }
+        });
+
+        // POST a new card
+        app.post('/card', async (req, res) => {
+            try {
+                const { title, header, subHeader,
+                    description, imageUrl } = req.body;
+                const newCard = { title, header, subHeader,
+                    description, imageUrl };
+                const result = await CardCollection.insertOne(newCard);
+
+                if (result.insertedId) {
+                    res.status(201).send({ _id: result.insertedId, ...newCard });
+                } else {
+                    res.status(400).send({ error: "Failed to add card" });
+                }
+            } catch (error) {
+                console.error("Error adding card:", error);
+                res.status(500).send("Internal Server Error");
+            }
+        });
+
+
+
+        // DELETE a card
+        app.delete('/card/:id', async (req, res) => {
+            try {
+                const id = req.params.id;
+                const query = { _id: new ObjectId(id) };
+                const result = await CardCollection.deleteOne(query);
+                res.send(result);
+            } catch (error) {
+                console.error(error);
+                res.status(500).send("Internal Server Error");
+            }
+        });
+
+
         console.log("Pinged your deployment. You successfully connected to MongoDB!");
     } catch (error) {
         console.error("Database connection error:", error);
-    } finally {
-        // Ensure proper cleanup if necessary
     }
 }
 
@@ -181,12 +230,6 @@ run().catch(console.dir);
 // Root Route
 app.get('/', (req, res) => {
     res.send('Landing Page is running');
-});
-
-// Global error handler
-app.use((err, req, res, next) => {
-    console.error('Global error handler:', err);
-    res.status(500).send(`Something broke! Error: ${err.message}`);
 });
 
 // Start Server
