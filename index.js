@@ -12,7 +12,8 @@ const port = process.env.PORT || 5000;
 // Middleware
 app.use(cors({
     origin: [
-        'https://travel.nariaholidays.com'
+        'http://localhost:5173',
+        'https://travel.nariaholidays.com/'
         // Add other allowed origins if necessary
     ],
     credentials: true
